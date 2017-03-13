@@ -36,7 +36,7 @@ int main(int argc, char const *argv[]) {
 	// Create network address data structure
 	struct sockaddr_in serverAddress;
 	serverAddress.sin_family = AF_INET;
-	serverAddress.sin_port = htons(3030);
+	serverAddress.sin_port = htons(3030); // big endian / little endian
 	serverAddress.sin_addr.s_addr = inet_addr(argv[1]);
 
 

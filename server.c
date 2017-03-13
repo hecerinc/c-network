@@ -3,11 +3,17 @@
 #include <unistd.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <pthread.h>
 // #include <arpa/inet.h>
 // #include <sys/socket.h>
 #include <stdlib.h>
 
 void handler(int);
+void *ThreadMain(void *arg);
+
+struct ThreadArgs {
+	int clntSock;
+};
 
 int main(void) {
 
@@ -18,6 +24,11 @@ int main(void) {
 	    printf("WSAStartup failed: %d\n", result);
 	    exit(1);
 	}
+
+	// Threading
+	pthread_t threadID;
+	struct ThreadArgs * threadArgs;
+
 	// Opens the stream
 	int socketId = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if(socketId == -1) { // check if successfull
@@ -32,8 +43,9 @@ int main(void) {
 	struct sockaddr_in serverAddress;
 	memset(&serverAddress, 0, sizeof(serverAddress));
 	serverAddress.sin_family = AF_INET;
-	serverAddress.sin_port = htons(3030);
+	serverAddress.sin_port = htons(3030); // big endian / little endian
 	serverAddress.sin_addr.s_addr = htonl(INADDR_ANY);
+
 
 	// Assign an address to socket
 	int status = bind(socketId, (struct sockaddr *) &serverAddress, sizeof(serverAddress));
@@ -67,10 +79,19 @@ int main(void) {
 			printf("Could not accept connection\n");
 			exit(1);
 		}
+		if((threadArgs = (struct ThreadArgs *) malloc(sizeof(struct ThreadArgs))) == NULL){
+			printf("Could not allocate memory\n");
+			exit(1);
+		}
+		threadArgs->clntSock = clntSock;
+		if(pthread_create(&threadID, NULL, ThreadMain, (void *) threadArgs) != 0){
+			printf("Could not create thread\n");
+			exit(1);
+		}
 
-		printf("Handling client %s\n", inet_ntoa(clientAddr.sin_addr));
-		handler(clntSock);
-		printf("Client %s disconnected\n", inet_ntoa(clientAddr.sin_addr));
+		// printf("Handling client %s\n", inet_ntoa(clientAddr.sin_addr));
+		// handler(clntSock);
+		// printf("Client %s disconnected\n", inet_ntoa(clientAddr.sin_addr));
 		// Commmunicate
 		// Close the connection
 	}
@@ -105,3 +126,11 @@ void handler(int clientSocket) {
 	closesocket(clientSocket); // Windows
 }
 
+void *ThreadMain (void * threadArgs) {
+	int clntSock;
+	pthread_detach(pthread_self());
+	clntSock = ((struct ThreadArgs *) threadArgs)->clntSock;
+	free(threadArgs);
+	handler(clntSock);
+	return NULL;
+}
