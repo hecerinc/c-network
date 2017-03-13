@@ -8,6 +8,8 @@
 // #include <sys/socket.h>
 #include <stdlib.h>
 
+#define MAX_CONNECTED_CLIENTS 10
+
 void handler(int);
 void *ThreadMain(void *arg);
 
@@ -15,7 +17,13 @@ struct ThreadArgs {
 	int clntSock;
 };
 
+// static int connectedClients[MAX_CONNECTED_CLIENTS];
+// size_t active_clients;
+
+
 int main(void) {
+
+	active_clients = 0;
 
 	WSADATA wsaData;
 	int result;
@@ -79,12 +87,19 @@ int main(void) {
 			printf("Could not accept connection\n");
 			exit(1);
 		}
-		if((threadArgs = (struct ThreadArgs *) malloc(sizeof(struct ThreadArgs))) == NULL){
+		if((threadArgs = (struct ThreadArgs *) malloc(sizeof(struct ThreadArgs))) == NULL) {
 			printf("Could not allocate memory\n");
 			exit(1);
 		}
 		threadArgs->clntSock = clntSock;
-		if(pthread_create(&threadID, NULL, ThreadMain, (void *) threadArgs) != 0){
+		if(active_clients < MAX_CONNECTED_CLIENTS) {
+			connectedClients[active_clients++] = clntSock;
+		}
+		else {
+			fprintf(stderr, "Too many clients connected.\n");
+			exit(1);
+		}
+		if(pthread_create(&threadID, NULL, ThreadMain, (void *) threadArgs) != 0) {
 			printf("Could not create thread\n");
 			exit(1);
 		}
@@ -113,7 +128,7 @@ void handler(int clientSocket) {
 		exit(1);
 	}
 	while(msg_size > 0) { // 0 indicates end of transmission
-		if(send(clientSocket, buffer, msg_size, 0) != msg_size) {
+		if(send(connectedClients[i], buffer, msg_size, 0) != msg_size) {
 			printf("send() failed\n");
 			exit(1);
 		}
